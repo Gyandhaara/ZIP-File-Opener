@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZIP File Opener - Gyandhaara.in</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .drop-zone { 
+            border: 3px dashed #4f46e5; 
+            transition: all 0.3s ease; 
+            background: rgba(255, 255, 255, 0.9);
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .drop-zone:hover { 
+            background: rgba(238, 242, 255, 0.95); 
+            border-color: #7c3aed;
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+        .drop-zone.active {
+            background: rgba(199, 210, 254, 0.8);
+            border-color: #8b5cf6;
+        }
+        .preview-img { max-height: 200px; margin: 5px auto; }
+        .tab { 
+            cursor: pointer; 
+            padding: 12px 20px; 
+            border-radius: 8px 8px 0 0; 
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        .tab:hover {
+            background: rgba(79, 70, 229, 0.1);
+        }
+        .tab.active { 
+            background: #4f46e5; 
+            color: white; 
+            box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .mobile-optimized { max-width: 100%; overflow-x: hidden; }
+        .file-icon { margin-right: 10px; color: #6a11cb; }
+        .file-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 14px 18px; 
+            border-bottom: 1px solid #eee; 
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .file-item:hover { 
+            background-color: #f8faff; 
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .file-list-header { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 18px; 
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white; 
+            border-radius: 12px 12px 0 0; 
+            font-weight: bold; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .preview-area { 
+            margin-top: 30px; 
+            border: 1px solid #ddd; 
+            border-radius: 12px; 
+            padding: 20px; 
+            background-color: #f9f9f9;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .preview-content { 
+            max-height: 400px; 
+            overflow: auto; 
+            white-space: pre-wrap; 
+            font-family: 'Consolas', monospace; 
+            background-color: white; 
+            padding: 20px; 
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .image-preview { 
+            max-width: 100%; 
+            max-height: 400px; 
+            display: block; 
+            margin: 0 auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .upload-icon {
+            font-size: 64px;
+            color: #4f46e5;
+            margin-bottom: 16px;
+        }
+        .upload-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 8px;
+        }
+        .upload-subtext {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+        .container-main {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .file-count {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        @media (max-width: 768px) {
+            .mobile-controls { flex-direction: column; }
+            .mobile-controls button, .mobile-controls select { width: 100%; margin-bottom: 8px; }
+            .file-list-header, .file-item { flex-direction: column; align-items: flex-start; }
+            .file-size, .file-actions { width: auto; text-align: left; margin-top: 8px; }
+            .file-actions { display: flex; gap: 10px; }
+            .drop-zone { min-height: 180px; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen mobile-optimized py-8">
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 max-w-4xl">
+        <div class="container-main">
+            <!-- Header -->
+            <header class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white p-6 text-center">
+                <h1 class="text-3xl font-bold mb-2">ZIP File Opener</h1>
+                <p class="text-indigo-100">Made by Gyandhaara.in</p>
+            </header>
+
+            <!-- Tabs -->
+            <div class="bg-white border-b">
+                <div class="container mx-auto flex overflow-x-auto">
+                    <div class="tab active" data-tab="opener">
+                        <i class="fas fa-folder-open mr-2"></i>ZIP Opener
+                    </div>
+                    <div class="tab" data-tab="info">
+                        <i class="fas fa-info-circle mr-2"></i>Tool Information
+                    </div>
+                    <div class="tab" data-tab="credits">
+                        <i class="fas fa-award mr-2"></i>Credits
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <main class="flex-grow p-6">
+                
+                <!-- ZIP Opener Tab -->
+                <div id="opener" class="tab-content active">
+                    <!-- Upload -->
+                    <div id="dropZone" class="drop-zone p-8 rounded-lg text-center mb-6">
+                        <i class="upload-icon fas fa-file-archive"></i>
+                        <p class="upload-text">Click or Drag & Drop ZIP file here</p>
+                        <p class="upload-subtext">Supports .zip files up to 100MB</p>
+                        <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-lg transition duration-300 transform hover:scale-105 shadow-md">
+                            <i class="fas fa-cloud-upload-alt mr-2"></i>Browse Files
+                        </button>
+                        <input type="file" id="fileInput" accept=".zip" class="hidden">
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="flex flex-wrap gap-3 mb-6 mobile-controls">
+                        <button id="resetBtn" class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium py-2.5 px-5 rounded-lg transition duration-300 flex-1 min-w-[140px] shadow-md">
+                            <i class="fas fa-redo mr-2"></i>Reset
+                        </button>
+                    </div>
+
+                    <!-- File List -->
+                    <div id="file-list" class="mt-6" style="display: none;">
+                        <div class="file-list-header">
+                            <div class="file-name flex-1">File Name</div>
+                            <div class="file-size w-32 text-center">Size</div>
+                            <div class="file-actions w-40 text-center">Actions</div>
+                        </div>
+                        <div id="file-items" class="bg-gray-50 rounded-b-lg p-4 max-h-96 overflow-y-auto"></div>
+                    </div>
+
+                    <!-- File Count -->
+                    <div class="file-count mt-6 text-center" id="file-count" style="display: none;"></div>
+
+                    <!-- Preview Area -->
+                    <div id="preview-area" class="preview-area" style="display: none;">
+                        <div class="preview-header flex justify-between items-center mb-4 pb-3 border-b border-gray-300">
+                            <h3 id="preview-title" class="text-xl font-bold text-indigo-700">File Preview</h3>
+                            <button id="close-preview" class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-300 shadow-md">
+                                <i class="fas fa-times mr-2"></i>Close
+                            </button>
+                        </div>
+                        <div class="preview-content" id="preview-content"></div>
+                    </div>
+                </div>
+                
+                <!-- Information Tab -->
+                <div id="info" class="tab-content p-6 bg-white rounded-lg shadow-inner">
+                    <h2 class="text-2xl font-bold mb-4 text-indigo-600">
+                        <i class="fas fa-info-circle mr-2"></i>Tool Information
+                    </h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">About This Tool</h3>
+                        <p class="mb-3 text-gray-700">This ZIP File Opener allows you to explore and extract contents from ZIP archives directly in your browser. No server uploads required - all processing happens locally on your device.</p>
+                        <p class="mb-3 text-gray-700">Perfect for quickly checking ZIP file contents, previewing files before downloading, or extracting specific files from archives without installing any software.</p>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">Features</h3>
+                        <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                            <li>Open and explore ZIP files directly in your browser</li>
+                            <li>Preview text files and images without downloading</li>
+                            <li>Download individual files or all files at once</li>
+                            <li>View file details including size and type</li>
+                            <li>100% client-side processing - your files never leave your device</li>
+                            <li>Mobile-friendly interface</li>
+                            <li>Free to use with no limitations</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">How to Use</h3>
+                        <ol class="list-decimal pl-5 space-y-2 text-gray-700">
+                            <li>Click the upload area or drag and drop your ZIP file</li>
+                            <li>Browse the list of files contained in the archive</li>
+                            <li>Click "Preview" to view text files or images directly in the browser</li>
+                            <li>Click "Download" to save individual files to your device</li>
+                            <li>Use "Reset" to clear the current ZIP file and start over</li>
+                        </ol>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">Privacy & Security</h3>
+                        <p class="mb-3 text-gray-700">Your privacy is important. This tool processes all files locally in your browser. No data is sent to any server, ensuring your documents remain completely private and secure.</p>
+                        <p class="text-gray-700">The tool is open source and available for anyone to inspect and verify.</p>
+                    </div>
+                </div>
+                
+                <!-- Credits Tab -->
+                <div id="credits" class="tab-content p-6 bg-white rounded-lg shadow-inner">
+                    <h2 class="text-2xl font-bold mb-4 text-indigo-600">
+                        <i class="fas fa-award mr-2"></i>Credits & Attribution
+                    </h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">Development</h3>
+                        <p class="mb-3 text-gray-700">This tool was created by <span class="font-semibold text-indigo-600">Gyandhaara.in</span> as a free resource for the community.</p>
+                        <p class="text-gray-700">Gyandhaara.in is dedicated to creating useful web tools that help people with everyday tasks without compromising their privacy.</p>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">Technologies Used</h3>
+                        <p class="mb-2 text-gray-700">This tool is built using several open-source libraries:</p>
+                        <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                            <li>
+                                <span class="font-semibold text-indigo-600">JSZip</span> - A JavaScript library for creating, reading and editing ZIP files
+                                <div class="text-sm text-gray-600 ml-4">Used to parse and extract ZIP file contents in the browser</div>
+                            </li>
+                            <li>
+                                <span class="font-semibold text-indigo-600">Tailwind CSS</span> - A utility-first CSS framework
+                                <div class="text-sm text-gray-600 ml-4">Used for styling and responsive design</div>
+                            </li>
+                            <li>
+                                <span class="font-semibold text-indigo-600">Font Awesome</span> - Icon library
+                                <div class="text-sm text-gray-600 ml-4">Used for intuitive icons throughout the interface</div>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">License</h3>
+                        <p class="mb-3 text-gray-700">This tool is released under the MIT License, which means you are free to use, modify, and distribute it.</p>
+                        <div class="bg-gray-100 p-4 rounded-lg text-sm border border-gray-300">
+                            <p class="font-semibold text-gray-800">MIT License</p>
+                            <p class="text-gray-700">Copyright (c) 2025 Gyandhaara.in</p>
+                            <p class="mt-2 text-gray-700">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+                            <p class="mt-2 text-gray-700">The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+                            <p class="mt-2 text-gray-700">THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-800">Contact & Support</h3>
+                        <p class="text-gray-700">If you encounter any issues or have suggestions for improvements, please visit <a href="https://gyandhaara.in" class="text-indigo-600 hover:underline font-medium">gyandhaara.in</a> for more information.</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Footer -->
+            <footer class="bg-gradient-to-r from-gray-800 to-gray-900 text-gray-300 text-center p-4">
+                <p>© 2025 Gyandhaara.in | MIT License</p>
+                <p>This tool is open-source and free to use.</p>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const fileList = document.getElementById('file-list');
+            const fileItems = document.getElementById('file-items');
+            const fileCount = document.getElementById('file-count');
+            const previewArea = document.getElementById('preview-area');
+            const previewContent = document.getElementById('preview-content');
+            const previewTitle = document.getElementById('preview-title');
+            const closePreview = document.getElementById('close-preview');
+            const resetBtn = document.getElementById('resetBtn');
+            const browseBtn = uploadArea.querySelector('button');
+            
+            let currentZip = null;
+            
+            // Tab functionality
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab).classList.add('active');
+                });
+            });
+            
+            // Event listeners for file upload
+            uploadArea.addEventListener('click', (e) => {
+                if (e.target !== browseBtn) {
+                    fileInput.click();
+                }
+            });
+            
+            browseBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('active');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('active');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('active');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.name.toLowerCase().endsWith('.zip')) {
+                        handleZipFile(file);
+                    } else {
+                        alert('Please upload a ZIP file.');
+                    }
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    if (file.name.toLowerCase().endsWith('.zip')) {
+                        handleZipFile(file);
+                    } else {
+                        alert('Please upload a ZIP file.');
+                    }
+                }
+            });
+            
+            closePreview.addEventListener('click', () => {
+                previewArea.style.display = 'none';
+            });
+            
+            resetBtn.addEventListener('click', () => {
+                currentZip = null;
+                fileItems.innerHTML = '';
+                fileCount.textContent = '';
+                fileCount.style.display = 'none';
+                previewArea.style.display = 'none';
+                fileInput.value = '';
+                fileList.style.display = 'none';
+            });
+            
+            // Handle ZIP file processing
+            function handleZipFile(file) {
+                JSZip.loadAsync(file)
+                    .then(function(zip) {
+                        currentZip = zip;
+                        displayFiles(zip);
+                    })
+                    .catch(function(error) {
+                        alert('Error reading ZIP file: ' + error.message);
+                    });
+            }
+            
+            // Display files in the ZIP archive
+            function displayFiles(zip) {
+                fileItems.innerHTML = '';
+                let fileCountValue = 0;
+                
+                zip.forEach(function(relativePath, zipEntry) {
+                    if (!zipEntry.dir) {
+                        fileCountValue++;
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+                        
+                        const fileName = document.createElement('div');
+                        fileName.className = 'file-name flex items-center flex-1';
+                        
+                        const fileIcon = document.createElement('span');
+                        fileIcon.className = 'file-icon';
+                        fileIcon.textContent = getFileIcon(zipEntry.name);
+                        fileName.appendChild(fileIcon);
+                        
+                        const nameText = document.createElement('span');
+                        nameText.textContent = zipEntry.name;
+                        nameText.className = 'truncate';
+                        fileName.appendChild(nameText);
+                        
+                        const fileSize = document.createElement('div');
+                        fileSize.className = 'file-size w-32 text-center';
+                        fileSize.textContent = formatFileSize(zipEntry._data.uncompressedSize);
+                        
+                        const fileActions = document.createElement('div');
+                        fileActions.className = 'file-actions w-40 text-center flex justify-center space-x-2';
+                        
+                        const previewBtn = document.createElement('button');
+                        previewBtn.className = 'bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm transition duration-200 shadow-sm';
+                        previewBtn.innerHTML = '<i class="fas fa-eye mr-1"></i>Preview';
+                        previewBtn.addEventListener('click', () => previewFile(zipEntry));
+                        
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.className = 'bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded text-sm transition duration-200 shadow-sm';
+                        downloadBtn.innerHTML = '<i class="fas fa-download mr-1"></i>Download';
+                        downloadBtn.addEventListener('click', () => downloadFile(zipEntry));
+                        
+                        fileActions.appendChild(previewBtn);
+                        fileActions.appendChild(downloadBtn);
+                        
+                        fileItem.appendChild(fileName);
+                        fileItem.appendChild(fileSize);
+                        fileItem.appendChild(fileActions);
+                        
+                        fileItems.appendChild(fileItem);
+                    }
+                });
+                
+                if (fileCountValue === 0) {
+                    fileItems.innerHTML = '<div class="p-6 text-center text-gray-500 bg-white rounded-lg"><i class="fas fa-folder-open text-4xl mb-3 text-gray-400"></i><p>No files found in the ZIP archive</p></div>';
+                }
+                
+                fileList.style.display = 'block';
+                fileCount.textContent = `Total Files: ${fileCountValue}`;
+                fileCount.style.display = 'block';
+            }
+            
+            // Preview file content
+            function previewFile(zipEntry) {
+                const fileExtension = getFileExtension(zipEntry.name);
+                
+                if (isTextFile(fileExtension)) {
+                    zipEntry.async('string')
+                        .then(function(content) {
+                            previewTitle.textContent = `Preview: ${zipEntry.name}`;
+                            previewContent.innerHTML = '';
+                            const pre = document.createElement('pre');
+                            pre.textContent = content;
+                            pre.className = 'whitespace-pre-wrap break-words';
+                            previewContent.appendChild(pre);
+                            previewArea.style.display = 'block';
+                            // Scroll to preview area
+                            previewArea.scrollIntoView({ behavior: 'smooth' });
+                        })
+                        .catch(function(error) {
+                            previewContent.textContent = `Error loading file: ${error.message}`;
+                            previewArea.style.display = 'block';
+                        });
+                } else if (isImageFile(fileExtension)) {
+                    zipEntry.async('blob')
+                        .then(function(blob) {
+                            const url = URL.createObjectURL(blob);
+                            previewTitle.textContent = `Preview: ${zipEntry.name}`;
+                            previewContent.innerHTML = `<img src="${url}" class="image-preview" alt="${zipEntry.name}">`;
+                            previewArea.style.display = 'block';
+                            // Scroll to preview area
+                            previewArea.scrollIntoView({ behavior: 'smooth' });
+                        })
+                        .catch(function(error) {
+                            previewContent.textContent = `Error loading image: ${error.message}`;
+                            previewArea.style.display = 'block';
+                        });
+                } else {
+                    previewTitle.textContent = `Preview: ${zipEntry.name}`;
+                    previewContent.textContent = `Preview not available for ${fileExtension} files. Use download instead.`;
+                    previewArea.style.display = 'block';
+                    // Scroll to preview area
+                    previewArea.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+            
+            // Download individual file
+            function downloadFile(zipEntry) {
+                zipEntry.async('blob')
+                    .then(function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = zipEntry.name;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    });
+            }
+            
+            // Helper functions
+            function getFileIcon(filename) {
+                const extension = getFileExtension(filename);
+                
+                if (isImageFile(extension)) return '🖼️';
+                if (isTextFile(extension)) return '📄';
+                if (extension === 'pdf') return '📕';
+                if (['doc', 'docx'].includes(extension)) return '📘';
+                if (['xls', 'xlsx'].includes(extension)) return '📗';
+                if (['ppt', 'pptx'].includes(extension)) return '📙';
+                if (['zip', 'rar', '7z'].includes(extension)) return '📦';
+                if (['mp3', 'wav', 'flac'].includes(extension)) return '🎵';
+                if (['mp4', 'avi', 'mkv'].includes(extension)) return '🎬';
+                
+                return '📄';
+            }
+            
+            function getFileExtension(filename) {
+                return filename.split('.').pop().toLowerCase();
+            }
+            
+            function isTextFile(extension) {
+                const textExtensions = ['txt', 'html', 'htm', 'css', 'js', 'json', 'xml', 'csv', 'md', 'log'];
+                return textExtensions.includes(extension);
+            }
+            
+            function isImageFile(extension) {
+                const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+                return imageExtensions.includes(extension);
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        });
+  </script>
+  <script>
+    function sendHeight() {
+      const height = document.body.scrollHeight;
+      parent.postMessage({ type: "setHeight", height: height }, "*");
+    }
+
+    window.addEventListener("load", sendHeight);
+    window.addEventListener("resize", sendHeight);
+    setInterval(sendHeight, 500);
+  </script>
+</body>
+</html>
