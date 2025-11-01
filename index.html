@@ -339,7 +339,7 @@
             
             let currentZip = null;
             
-            // Tab functionality
+            // Tab functionality - FIXED: No automatic navigation
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.addEventListener('click', () => {
                     // Remove active class from all tabs and contents
@@ -351,6 +351,9 @@
                     document.getElementById(tab.dataset.tab).classList.add('active');
                 });
             });
+
+            // REMOVED: Any automatic tab switching code
+            // The tool will now stay on the ZIP opener tab unless manually changed
             
             // Event listeners for file upload
             uploadArea.addEventListener('click', (e) => {
